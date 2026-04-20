@@ -1,6 +1,7 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
+import serverless from 'serverless-http'
 
 import { env } from './config/env.js'
 import { authRouter } from './routes/auth.js'
@@ -32,3 +33,8 @@ export function createApp() {
 
   return app
 }
+
+const app = createApp()
+const handler = serverless(app)
+
+export default handler
