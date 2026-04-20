@@ -15,7 +15,7 @@ export function createApp() {
       origin: env.CLIENT_ORIGIN
     })
   )
-  app.use(helmet())
+  app.use((helmet as any)())
   app.use(express.json())
 
   app.get('/', (_request, response) => {
