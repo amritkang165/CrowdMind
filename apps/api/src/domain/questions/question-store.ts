@@ -35,7 +35,10 @@ type ListFilters = {
 const HOUR_MS = 60 * 60 * 1000
 
 function createSeedQuestion(
-  input: Omit<QuestionRecord, 'id' | 'createdAt' | 'resolvedAt' | 'closeAt'> & {
+  input: Omit<
+    QuestionRecord,
+    'id' | 'createdAt' | 'resolvedAt' | 'resolvedOutcome' | 'closeAt'
+  > & {
     closeOffsetHours: number
     createdOffsetHours: number
   }
