@@ -19,6 +19,7 @@ import {
   fetchMyPrediction,
   fetchQuestionDetail,
   fetchQuestions,
+  resolveQuestion,
   startDemoSession,
   submitPrediction,
   type Prediction,
@@ -687,6 +688,9 @@ function QuestionDetailPage() {
   const [selectedOption, setSelectedOption] = useState<string>('')
   const [probability, setProbability] = useState(50)
   const [confidence, setConfidence] = useState(70)
+  const [resolveOutcome, setResolveOutcome] = useState('')
+  const [resolveState, setResolveState] = useState<'idle' | 'loading'>('idle')
+  const [resolveError, setResolveError] = useState('')
 
   async function ensureSession() {
     if (authToken) {
@@ -794,6 +798,8 @@ function QuestionDetailPage() {
   }, [authToken, question])
 
   const activePrediction = authToken ? myPrediction : null
+  const isAuthor = !!(currentUser && question && question.author.id === currentUser.id)
+  const canResolve = isAuthor && question?.status === 'closed'
 
   async function handleSubmitPrediction() {
     if (!question) {
@@ -823,6 +829,26 @@ function QuestionDetailPage() {
       )
     } finally {
       setSubmitState('idle')
+    }
+  }
+
+  async function handleResolve() {
+    if (!question || !authToken || !resolveOutcome) {
+      return
+    }
+
+    setResolveState('loading')
+
+    try {
+      const result = await resolveQuestion(question.id, resolveOutcome, authToken)
+      setQuestion(result.question)
+      setResolveError('')
+    } catch (error) {
+      setResolveError(
+        error instanceof Error ? error.message : 'Unable to resolve question'
+      )
+    } finally {
+      setResolveState('idle')
     }
   }
 
@@ -1048,15 +1074,55 @@ function QuestionDetailPage() {
                 </div>
               </section>
 
-              <section className="rounded-[2rem] border border-sky-300/20 bg-sky-300/10 p-6 backdrop-blur">
-                <p className="font-mono text-xs uppercase tracking-[0.28em] text-sky-100">
-                  Next phase preview
-                </p>
-                <p className="mt-3 text-sm leading-7 text-sky-50/90">
-                  Outcome resolution and credibility updates come next, so these
-                  predictions can start changing future user influence.
-                </p>
-              </section>
+              {question.resolvedOutcome ? (
+                <section className="rounded-[2rem] border border-emerald-300/25 bg-emerald-300/10 p-6 backdrop-blur">
+                  <p className="font-mono text-xs uppercase tracking-[0.28em] text-emerald-200">
+                    Resolved outcome
+                  </p>
+                  <p className="mt-3 text-2xl font-semibold text-white">
+                    {question.resolvedOutcome}
+                  </p>
+                  <p className="mt-2 text-sm text-emerald-50/80">
+                    This question has been officially resolved.
+                  </p>
+                </section>
+              ) : canResolve ? (
+                <section className="rounded-[2rem] border border-amber-300/25 bg-amber-300/10 p-6 backdrop-blur">
+                  <p className="font-mono text-xs uppercase tracking-[0.28em] text-amber-200">
+                    Resolve question
+                  </p>
+                  <p className="mt-3 text-sm text-amber-50/80">
+                    You authored this question. Select the correct outcome to close the loop.
+                  </p>
+                  <div className="mt-4 grid gap-3">
+                    {question.options.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setResolveOutcome(option)}
+                        className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
+                          resolveOutcome === option
+                            ? 'border-amber-300/50 bg-amber-300/20 text-amber-50'
+                            : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20'
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                  {resolveError ? (
+                    <p className="mt-3 text-sm text-rose-200">{resolveError}</p>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => void handleResolve()}
+                    disabled={!resolveOutcome || resolveState === 'loading'}
+                    className="mt-4 w-full rounded-full border border-amber-300/30 bg-amber-300/12 px-4 py-3 text-sm text-amber-100 transition hover:bg-amber-300/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {resolveState === 'loading' ? 'Resolving...' : 'Confirm resolution'}
+                  </button>
+                </section>
+              ) : null}
             </aside>
           </section>
         ) : null}
@@ -1070,7 +1136,7 @@ function RoadmapPage() {
     'Phase 1: foundation, auth, validation, testing',
     'Phase 2: question creation and browse flows',
     'Phase 3: prediction submission and consensus',
-    'Phase 4: resolution, credibility, and leaderboard'
+    'Phase 4: resolution mechanism (MVP)'
   ]
 
   return (

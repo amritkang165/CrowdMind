@@ -108,6 +108,7 @@ function serializeQuestion(question: QuestionRecord) {
     category: question.category,
     closeAt: question.closeAt,
     resolvedAt: question.resolvedAt,
+    resolvedOutcome: question.resolvedOutcome,
     createdAt: question.createdAt,
     author: {
       id: question.authorId,
@@ -392,6 +393,73 @@ questionsRouter.post(
     })
   }
 )
+
+const resolveQuestionSchema = z.object({
+  outcome: z.string().trim().min(1).max(80)
+})
+
+questionsRouter.post('/:questionId/resolve', authenticate, (request, response) => {
+  const questionId = String(request.params.questionId)
+  const question = questionStore.findById(questionId)
+
+  if (!question) {
+    response.status(404).json({ message: 'Question not found' })
+    return
+  }
+
+  if (question.authorId !== request.auth!.userId) {
+    response.status(403).json({ message: 'Only the question author can resolve it' })
+    return
+  }
+
+  if (deriveQuestionStatus(question) === 'resolved') {
+    response.status(409).json({ message: 'Question is already resolved' })
+    return
+  }
+
+  if (deriveQuestionStatus(question) === 'open') {
+    response.status(409).json({ message: 'Question must be closed before resolving' })
+    return
+  }
+
+  const parsed = resolveQuestionSchema.safeParse(request.body)
+
+  if (!parsed.success) {
+    response.status(400).json({
+      message: 'Invalid resolution payload',
+      issues: parsed.error.flatten()
+    })
+    return
+  }
+
+  const { outcome } = parsed.data
+
+  const validOptions = question.type === 'probability' ? null : question.options
+
+  if (validOptions && !validOptions.includes(outcome)) {
+    response.status(400).json({
+      message: `Outcome must be one of: ${validOptions.join(', ')}`
+    })
+    return
+  }
+
+  if (question.type === 'probability') {
+    const numericOutcome = Number(outcome)
+
+    if (isNaN(numericOutcome) || numericOutcome < 0 || numericOutcome > 100) {
+      response.status(400).json({
+        message: 'Probability outcome must be a number between 0 and 100'
+      })
+      return
+    }
+  }
+
+  const resolvedQuestion = questionStore.resolveQuestion(questionId, outcome)!
+
+  response.json({
+    question: serializeQuestion(resolvedQuestion)
+  })
+})
 
 questionsRouter.post('/', authenticate, (request, response) => {
   const parsed = createQuestionSchema.safeParse(request.body)

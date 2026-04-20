@@ -10,6 +10,7 @@ export type QuestionRecord = {
   category: string
   closeAt: string
   resolvedAt: string | null
+  resolvedOutcome: string | null
   createdAt: string
   authorId: string
   authorName: string
@@ -50,6 +51,7 @@ function createSeedQuestion(
     category: input.category,
     closeAt: new Date(now + input.closeOffsetHours * HOUR_MS).toISOString(),
     resolvedAt: null,
+    resolvedOutcome: null,
     createdAt: new Date(now - input.createdOffsetHours * HOUR_MS).toISOString(),
     authorId: input.authorId,
     authorName: input.authorName
@@ -143,12 +145,26 @@ export class InMemoryQuestionStore {
       category: input.category.trim(),
       closeAt: input.closeAt,
       resolvedAt: null,
+      resolvedOutcome: null,
       createdAt: new Date().toISOString(),
       authorId: input.authorId,
       authorName: input.authorName
     }
 
     this.questions.unshift(question)
+
+    return question
+  }
+
+  resolveQuestion(id: string, outcome: string): QuestionRecord | undefined {
+    const question = this.questions.find((q) => q.id === id)
+
+    if (!question) {
+      return undefined
+    }
+
+    question.resolvedAt = new Date().toISOString()
+    question.resolvedOutcome = outcome
 
     return question
   }

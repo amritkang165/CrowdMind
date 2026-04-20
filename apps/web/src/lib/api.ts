@@ -27,6 +27,7 @@ export type Question = {
   category: string
   closeAt: string
   resolvedAt: string | null
+  resolvedOutcome: string | null
   createdAt: string
   author: {
     id: string
@@ -221,16 +222,39 @@ export async function submitPrediction(
   input: SubmitPredictionInput,
   token: string
 ): Promise<{ prediction: Prediction; aggregate: QuestionAggregate }> {
-  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/predictions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(input)
-  })
+  const response = await fetch(
+    `${API_BASE_URL}/questions/${questionId}/predictions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(input)
+    }
+  )
 
   return parseResponse<{ prediction: Prediction; aggregate: QuestionAggregate }>(
     response
   )
+}
+
+export async function resolveQuestion(
+  questionId: string,
+  outcome: string,
+  token: string
+): Promise<{ question: Question }> {
+  const response = await fetch(
+    `${API_BASE_URL}/questions/${questionId}/resolve`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ outcome })
+    }
+  )
+
+  return parseResponse<{ question: Question }>(response)
 }

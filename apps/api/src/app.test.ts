@@ -75,6 +75,80 @@ describe('CrowdMind API foundation', () => {
     expect(response.body.questions[0].category).toBe('Crypto')
   })
 
+  it('resolves a closed question (MVP)', async () => {
+    // Create author
+    const authorResp = await request(app).post('/auth/register').send({
+      username: 'author',
+      email: 'author@example.com',
+      password: 'password123'
+    })
+    const authorToken = authorResp.body.token as string
+
+    // Create predictor
+    const predictorResp = await request(app).post('/auth/register').send({
+      username: 'predictor2',
+      email: 'predictor2@example.com',
+      password: 'password123'
+    })
+    const predictorToken = predictorResp.body.token as string
+
+    // Create a question with a past closeAt (already closed)
+    const closeAt = new Date(Date.now() - 1000).toISOString() // 1 second ago
+    const createResp = await request(app)
+      .post('/questions')
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({
+        title: 'Will the test suite pass on the first run?',
+        description: 'A synthetic question used to validate the resolution flow end-to-end.',
+        type: 'binary',
+        category: 'Product',
+        options: [],
+        closeAt: new Date(Date.now() + 100).toISOString() // create with tiny window
+      })
+
+    expect(createResp.status).toBe(201)
+    const questionId = createResp.body.question.id as string
+
+    const q = questionStore.findById(questionId)!
+
+    // Submit a correct prediction (Yes) while still open
+    const predResp = await request(app)
+      .post(`/questions/${questionId}/predictions`)
+      .set('Authorization', `Bearer ${predictorToken}`)
+      .send({ selectedOption: 'Yes', probability: null, confidence: 80 })
+
+    expect(predResp.status).toBe(201)
+
+    // Directly close the question by manipulating closeAt via the store
+    q.closeAt = closeAt // backdate to make it closed
+
+    // Resolve with correct outcome = 'Yes'
+    const resolveResp = await request(app)
+      .post(`/questions/${questionId}/resolve`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ outcome: 'Yes' })
+
+    expect(resolveResp.status).toBe(200)
+    expect(resolveResp.body.question.status).toBe('resolved')
+    expect(resolveResp.body.question.resolvedOutcome).toBe('Yes')
+
+    // Author cannot resolve an already-resolved question
+    const secondResolveResp = await request(app)
+      .post(`/questions/${questionId}/resolve`)
+      .set('Authorization', `Bearer ${authorToken}`)
+      .send({ outcome: 'No' })
+
+    expect(secondResolveResp.status).toBe(409)
+
+    // Non-author cannot resolve
+    const unauthorizedResp = await request(app)
+      .post(`/questions/${questionId}/resolve`)
+      .set('Authorization', `Bearer ${predictorToken}`)
+      .send({ outcome: 'Yes' })
+
+    expect(unauthorizedResp.status).toBe(403)
+  })
+
   it('creates a question and returns it in the feed', async () => {
     const registerResponse = await request(app).post('/auth/register').send({
       username: 'questionmaker',
