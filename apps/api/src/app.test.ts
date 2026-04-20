@@ -2,6 +2,7 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { createApp } from './app.js'
+import { questionStore } from './domain/questions/question-store.js'
 import { userStore } from './domain/users/user-store.js'
 
 describe('CrowdMind API foundation', () => {
@@ -9,6 +10,7 @@ describe('CrowdMind API foundation', () => {
 
   beforeEach(() => {
     userStore.clear()
+    questionStore.reset()
   })
 
   it('returns health status', async () => {
@@ -59,5 +61,46 @@ describe('CrowdMind API foundation', () => {
     })
 
     expect(duplicateResponse.status).toBe(409)
+  })
+
+  it('lists seeded questions and filters by category', async () => {
+    const response = await request(app).get('/questions').query({
+      category: 'Crypto'
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.body.questions).toHaveLength(1)
+    expect(response.body.questions[0].category).toBe('Crypto')
+  })
+
+  it('creates a question and returns it in the feed', async () => {
+    const registerResponse = await request(app).post('/auth/register').send({
+      username: 'questionmaker',
+      email: 'questionmaker@example.com',
+      password: 'password123'
+    })
+
+    const createResponse = await request(app)
+      .post('/questions')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        title: 'Will CrowdMind launch public beta before October 2026?',
+        description:
+          'This question tracks whether the team ships a public beta before the end of September 2026.',
+        type: 'binary',
+        category: 'Product',
+        options: [],
+        closeAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      })
+
+    expect(createResponse.status).toBe(201)
+    expect(createResponse.body.question.author.name).toBe('questionmaker')
+    expect(createResponse.body.question.options).toEqual(['Yes', 'No'])
+
+    const feedResponse = await request(app).get('/questions')
+
+    expect(feedResponse.body.questions[0].title).toBe(
+      'Will CrowdMind launch public beta before October 2026?'
+    )
   })
 })

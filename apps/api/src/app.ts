@@ -5,6 +5,7 @@ import helmet from 'helmet'
 import { env } from './config/env.js'
 import { authRouter } from './routes/auth.js'
 import { healthRouter } from './routes/health.js'
+import { questionsRouter } from './routes/questions.js'
 
 export function createApp() {
   const app = express()
@@ -21,12 +22,13 @@ export function createApp() {
     response.json({
       name: 'CrowdMind API',
       version: '0.1.0',
-      phase: 'foundation'
+      phase: 'question-system'
     })
   })
 
   app.use('/health', healthRouter)
   app.use('/auth', authRouter)
+  app.use('/questions', questionsRouter)
 
   return app
 }

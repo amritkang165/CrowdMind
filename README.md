@@ -19,7 +19,7 @@ CrowdMind is a collective intelligence platform where users create prediction qu
 ## Current Repository Structure
 
 - `apps/web`: React frontend with routing, Zustand state, Tailwind styling, and Vitest tests
-- `apps/api`: Express API with typed environment config, JWT auth skeleton, and Vitest/Supertest coverage
+- `apps/api`: Express API with typed environment config, JWT auth skeleton, question endpoints, and Vitest/Supertest coverage
 - `Docs`: source PRD and planning material
 
 ## Phase 1 Status
@@ -30,6 +30,15 @@ Phase 1 foundation is now implemented:
 - Frontend application shell with API health check wiring
 - Backend health endpoint plus register, login, and protected `me` endpoint
 - Environment examples for both apps
+
+## Phase 2 Status
+
+Phase 2 question flows are now implemented:
+
+- Question feed with seeded examples, category filters, and type filters
+- Question detail route for inspecting prompt structure and status
+- Authenticated question creation with a lightweight demo-author session
+- API endpoints for question list, detail, and create flows
 
 ## Commands
 
