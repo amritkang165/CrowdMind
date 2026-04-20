@@ -16,6 +16,29 @@ CrowdMind is a collective intelligence platform where users create prediction qu
 - Database: PostgreSQL
 - Real-time: WebSockets or Socket.io
 
+## Current Repository Structure
+
+- `apps/web`: React frontend with routing, Zustand state, Tailwind styling, and Vitest tests
+- `apps/api`: Express API with typed environment config, JWT auth skeleton, and Vitest/Supertest coverage
+- `Docs`: source PRD and planning material
+
+## Phase 1 Status
+
+Phase 1 foundation is now implemented:
+
+- Workspace scripts for local development, linting, testing, and production builds
+- Frontend application shell with API health check wiring
+- Backend health endpoint plus register, login, and protected `me` endpoint
+- Environment examples for both apps
+
+## Commands
+
+- `npm install`
+- `npm run dev`
+- `npm run lint`
+- `npm test`
+- `npm run build`
+
 ## Delivery Outline
 
 1. Foundation and architecture setup
