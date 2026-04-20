@@ -2,6 +2,7 @@ import request from 'supertest'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { createApp } from './app.js'
+import { predictionStore } from './domain/predictions/prediction-store.js'
 import { questionStore } from './domain/questions/question-store.js'
 import { userStore } from './domain/users/user-store.js'
 
@@ -11,6 +12,7 @@ describe('CrowdMind API foundation', () => {
   beforeEach(() => {
     userStore.clear()
     questionStore.reset()
+    predictionStore.clear()
   })
 
   it('returns health status', async () => {
@@ -102,5 +104,65 @@ describe('CrowdMind API foundation', () => {
     expect(feedResponse.body.questions[0].title).toBe(
       'Will CrowdMind launch public beta before October 2026?'
     )
+  })
+
+  it('submits and updates a prediction with aggregate consensus', async () => {
+    const registerResponse = await request(app).post('/auth/register').send({
+      username: 'predictor',
+      email: 'predictor@example.com',
+      password: 'password123'
+    })
+
+    const createResponse = await request(app)
+      .post('/questions')
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        title: 'Will CrowdMind ship phase 3 by July 2026?',
+        description:
+          'This asks whether the team completes phase 3 and ships prediction submission by July 31, 2026.',
+        type: 'binary',
+        category: 'Product',
+        options: [],
+        closeAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      })
+
+    const predictionResponse = await request(app)
+      .post(`/questions/${createResponse.body.question.id}/predictions`)
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        selectedOption: 'Yes',
+        probability: null,
+        confidence: 72
+      })
+
+    expect(predictionResponse.status).toBe(201)
+    expect(predictionResponse.body.aggregate.totalPredictions).toBe(1)
+    expect(predictionResponse.body.aggregate.weightedConsensus).toBe(72)
+
+    const updateResponse = await request(app)
+      .post(`/questions/${createResponse.body.question.id}/predictions`)
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+      .send({
+        selectedOption: 'No',
+        probability: null,
+        confidence: 60
+      })
+
+    expect(updateResponse.status).toBe(201)
+    expect(updateResponse.body.aggregate.totalPredictions).toBe(1)
+    expect(updateResponse.body.aggregate.weightedConsensus).toBe(40)
+
+    const detailResponse = await request(app).get(
+      `/questions/${createResponse.body.question.id}`
+    )
+
+    expect(detailResponse.body.aggregate.leadingOption).toBe('No')
+
+    const myPredictionResponse = await request(app)
+      .get(`/questions/${createResponse.body.question.id}/predictions/me`)
+      .set('Authorization', `Bearer ${registerResponse.body.token}`)
+
+    expect(myPredictionResponse.body.prediction.selectedOption).toBe('No')
+    expect(myPredictionResponse.body.prediction.confidence).toBe(60)
   })
 })

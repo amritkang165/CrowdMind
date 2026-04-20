@@ -40,6 +40,15 @@ Phase 2 question flows are now implemented:
 - Authenticated question creation with a lightweight demo-author session
 - API endpoints for question list, detail, and create flows
 
+## Phase 3 Status
+
+Phase 3 prediction workflows are now implemented:
+
+- Authenticated prediction submission and update flows on open questions
+- Question-level consensus snapshots with weighted aggregates and breakdowns
+- Frontend prediction UI for binary, multiple choice, and probability inputs
+- API coverage for prediction persistence, retrieval, and aggregate recalculation
+
 ## Commands
 
 - `npm install`
@@ -52,7 +61,7 @@ Phase 2 question flows are now implemented:
 
 1. Foundation and architecture setup
 2. Question and prediction workflows
-3. Consensus, resolution, and credibility logic
+3. Resolution, credibility logic, and leaderboards
 4. Real-time feed, graphs, and leaderboard
 5. Discussion, discovery, and polish
 

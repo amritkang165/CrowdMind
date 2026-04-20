@@ -16,10 +16,14 @@ import {
 import {
   createQuestion,
   fetchHealth,
-  fetchQuestion,
+  fetchMyPrediction,
+  fetchQuestionDetail,
   fetchQuestions,
   startDemoSession,
+  submitPrediction,
+  type Prediction,
   type Question,
+  type QuestionAggregate,
   type QuestionType
 } from './lib/api'
 import { useAppStore } from './store/app-store'
@@ -33,6 +37,14 @@ function formatDateLabel(value: string) {
     dateStyle: 'medium',
     timeStyle: 'short'
   })
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) {
+    return 'No consensus yet'
+  }
+
+  return `${value.toFixed(1)}%`
 }
 
 function toDateTimeLocalValue(date = new Date(Date.now() + 24 * 60 * 60 * 1000)) {
@@ -664,9 +676,28 @@ function CreateQuestionPage() {
 
 function QuestionDetailPage() {
   const { questionId = '' } = useParams()
+  const { authToken, currentUser, setSession } = useAppStore()
   const [question, setQuestion] = useState<Question | null>(null)
+  const [aggregate, setAggregate] = useState<QuestionAggregate | null>(null)
+  const [myPrediction, setMyPrediction] = useState<Prediction | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [predictionError, setPredictionError] = useState('')
+  const [submitState, setSubmitState] = useState<'idle' | 'loading'>('idle')
+  const [selectedOption, setSelectedOption] = useState<string>('')
+  const [probability, setProbability] = useState(50)
+  const [confidence, setConfidence] = useState(70)
+
+  async function ensureSession() {
+    if (authToken) {
+      return authToken
+    }
+
+    const session = await startDemoSession()
+    setSession(session.token, session.user)
+
+    return session.token
+  }
 
   useEffect(() => {
     let isActive = true
@@ -675,13 +706,23 @@ function QuestionDetailPage() {
       setIsLoading(true)
 
       try {
-        const nextQuestion = await fetchQuestion(questionId)
+        const detail = await fetchQuestionDetail(questionId)
 
         if (!isActive) {
           return
         }
 
-        setQuestion(nextQuestion)
+        setQuestion(detail.question)
+        setAggregate(detail.aggregate)
+        setConfidence(70)
+
+        if (detail.question.type === 'probability') {
+          setProbability(50)
+          setSelectedOption(detail.question.options[0] ?? '')
+        } else {
+          setSelectedOption(detail.question.options[0] ?? '')
+        }
+
         setErrorMessage('')
       } catch (error) {
         if (!isActive) {
@@ -705,6 +746,85 @@ function QuestionDetailPage() {
       isActive = false
     }
   }, [questionId])
+
+  useEffect(() => {
+    if (!question || !authToken) {
+      return
+    }
+
+    const activeQuestion = question
+    const activeToken = authToken
+    let isActive = true
+
+    async function loadMyPrediction() {
+      try {
+        const prediction = await fetchMyPrediction(activeQuestion.id, activeToken)
+
+        if (!isActive) {
+          return
+        }
+
+        setMyPrediction(prediction)
+
+        if (prediction) {
+          setConfidence(prediction.confidence)
+
+          if (activeQuestion.type === 'probability') {
+            setProbability(prediction.probability ?? 50)
+          } else {
+            setSelectedOption(
+              prediction.selectedOption ?? activeQuestion.options[0] ?? ''
+            )
+          }
+        }
+      } catch {
+        if (!isActive) {
+          return
+        }
+
+        setMyPrediction(null)
+      }
+    }
+
+    void loadMyPrediction()
+
+    return () => {
+      isActive = false
+    }
+  }, [authToken, question])
+
+  const activePrediction = authToken ? myPrediction : null
+
+  async function handleSubmitPrediction() {
+    if (!question) {
+      return
+    }
+
+    setSubmitState('loading')
+
+    try {
+      const token = await ensureSession()
+      const response = await submitPrediction(
+        question.id,
+        {
+          selectedOption: question.type === 'probability' ? null : selectedOption,
+          probability: question.type === 'probability' ? probability : null,
+          confidence
+        },
+        token
+      )
+
+      setMyPrediction(response.prediction)
+      setAggregate(response.aggregate)
+      setPredictionError('')
+    } catch (error) {
+      setPredictionError(
+        error instanceof Error ? error.message : 'Unable to submit prediction'
+      )
+    } finally {
+      setSubmitState('idle')
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,_#060b16_0%,_#111827_55%,_#0f172a_100%)] px-6 py-8 text-slate-100">
@@ -755,6 +875,104 @@ function QuestionDetailPage() {
                   ))}
                 </ul>
               </section>
+
+              <section className="mt-8 rounded-[1.5rem] border border-sky-300/15 bg-sky-300/8 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="font-mono text-xs uppercase tracking-[0.28em] text-sky-100">
+                    Submit prediction
+                  </p>
+                  <span className="text-sm text-slate-300">
+                    {currentUser
+                      ? `Forecasting as ${currentUser.username}`
+                      : 'A demo session will be created on first submit'}
+                  </span>
+                </div>
+
+                {question.status !== 'open' ? (
+                  <p className="mt-4 text-sm text-slate-300">
+                    This question is no longer open for new predictions.
+                  </p>
+                ) : (
+                  <>
+                    {question.type !== 'probability' ? (
+                      <div className="mt-5 grid gap-3 md:grid-cols-2">
+                        {question.options.map((option) => (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => setSelectedOption(option)}
+                            className={`rounded-2xl border px-4 py-4 text-left text-sm transition ${
+                              selectedOption === option
+                                ? 'border-sky-300/40 bg-sky-300/15 text-sky-50'
+                                : 'border-white/10 bg-white/5 text-slate-200 hover:border-white/20 hover:bg-white/8'
+                            }`}
+                          >
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <label className="mt-5 block text-sm text-slate-300">
+                        <span className="mb-2 block text-slate-400">
+                          Probability estimate
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={probability}
+                          onChange={(event) => setProbability(Number(event.target.value))}
+                          className="w-full"
+                        />
+                        <span className="mt-2 block text-sky-100">
+                          {probability}%
+                        </span>
+                      </label>
+                    )}
+
+                    <label className="mt-5 block text-sm text-slate-300">
+                      <span className="mb-2 block text-slate-400">Confidence</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={confidence}
+                        onChange={(event) => setConfidence(Number(event.target.value))}
+                        className="w-full"
+                      />
+                      <span className="mt-2 block text-amber-100">
+                        {confidence}%
+                      </span>
+                    </label>
+
+                    {predictionError ? (
+                      <p className="mt-4 rounded-2xl border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
+                        {predictionError}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-5 flex flex-wrap items-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => void handleSubmitPrediction()}
+                        disabled={submitState === 'loading'}
+                        className="rounded-full border border-sky-300/30 bg-sky-300/12 px-5 py-3 text-sm text-sky-100 transition hover:bg-sky-300/20 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {submitState === 'loading'
+                          ? 'Saving prediction...'
+                          : activePrediction
+                            ? 'Update prediction'
+                            : 'Submit prediction'}
+                      </button>
+                      {activePrediction ? (
+                        <span className="text-sm text-slate-300">
+                          Last saved {formatDateLabel(activePrediction.updatedAt)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </section>
             </article>
 
             <aside className="space-y-6">
@@ -778,13 +996,65 @@ function QuestionDetailPage() {
                 </dl>
               </section>
 
+              <section className="rounded-[2rem] border border-emerald-300/20 bg-emerald-300/10 p-6 backdrop-blur">
+                <p className="font-mono text-xs uppercase tracking-[0.28em] text-emerald-100">
+                  Consensus snapshot
+                </p>
+                <div className="mt-4 grid gap-4">
+                  <div>
+                    <p className="text-sm text-emerald-50/80">Weighted consensus</p>
+                    <p className="mt-1 text-3xl font-semibold text-white">
+                      {formatPercent(aggregate?.weightedConsensus ?? null)}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
+                    <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
+                      <p className="text-slate-400">Predictions</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">
+                        {aggregate?.totalPredictions ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
+                      <p className="text-slate-400">Avg confidence</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">
+                        {aggregate?.averageConfidence
+                          ? `${aggregate.averageConfidence}%`
+                          : 'n/a'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="rounded-[2rem] border border-white/10 bg-slate-950/60 p-6 backdrop-blur">
+                <p className="font-mono text-xs uppercase tracking-[0.28em] text-slate-400">
+                  Breakdown
+                </p>
+                <div className="mt-4 space-y-3">
+                  {(aggregate?.optionBreakdown ?? []).map((entry) => (
+                    <div key={entry.option}>
+                      <div className="mb-2 flex items-center justify-between text-sm text-slate-200">
+                        <span>{entry.option}</span>
+                        <span>{entry.percentage.toFixed(1)}%</span>
+                      </div>
+                      <div className="h-3 rounded-full bg-white/8">
+                        <div
+                          className="h-3 rounded-full bg-gradient-to-r from-sky-400 to-emerald-300"
+                          style={{ width: `${entry.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
               <section className="rounded-[2rem] border border-sky-300/20 bg-sky-300/10 p-6 backdrop-blur">
                 <p className="font-mono text-xs uppercase tracking-[0.28em] text-sky-100">
                   Next phase preview
                 </p>
                 <p className="mt-3 text-sm leading-7 text-sky-50/90">
-                  This page will become the prediction hub next, with confidence
-                  entry, consensus stats, and resolution tracking.
+                  Outcome resolution and credibility updates come next, so these
+                  predictions can start changing future user influence.
                 </p>
               </section>
             </aside>

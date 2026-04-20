@@ -30,25 +30,40 @@ vi.mock('./lib/api', () => ({
       status: 'open'
     }
   ]),
-  fetchQuestion: vi.fn().mockResolvedValue({
-    id: 'question-1',
-    title: 'Will CrowdMind onboard 100 beta testers this quarter?',
-    description:
-      'This asks whether the platform reaches 100 beta testers before the current quarter ends.',
-    type: 'binary',
-    options: ['Yes', 'No'],
-    category: 'Product',
-    closeAt: '2026-04-28T10:00:00.000Z',
-    resolvedAt: null,
-    createdAt: '2026-04-20T10:00:00.000Z',
-    author: {
-      id: 'user-1',
-      name: 'demoauthor'
+  fetchQuestionDetail: vi.fn().mockResolvedValue({
+    question: {
+      id: 'question-1',
+      title: 'Will CrowdMind onboard 100 beta testers this quarter?',
+      description:
+        'This asks whether the platform reaches 100 beta testers before the current quarter ends.',
+      type: 'binary',
+      options: ['Yes', 'No'],
+      category: 'Product',
+      closeAt: '2026-04-28T10:00:00.000Z',
+      resolvedAt: null,
+      createdAt: '2026-04-20T10:00:00.000Z',
+      author: {
+        id: 'user-1',
+        name: 'demoauthor'
+      },
+      status: 'open'
     },
-    status: 'open'
+    aggregate: {
+      totalPredictions: 1,
+      weightedConsensus: 72,
+      optionBreakdown: [
+        { option: 'Yes', percentage: 72 },
+        { option: 'No', percentage: 28 }
+      ],
+      leadingOption: 'Yes',
+      averageConfidence: 72,
+      latestPredictionAt: '2026-04-20T11:00:00.000Z'
+    }
   }),
+  fetchMyPrediction: vi.fn().mockResolvedValue(null),
   startDemoSession: vi.fn(),
-  createQuestion: vi.fn()
+  createQuestion: vi.fn(),
+  submitPrediction: vi.fn()
 }))
 
 describe('App', () => {

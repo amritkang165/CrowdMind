@@ -35,6 +35,31 @@ export type Question = {
   status: QuestionStatus
 }
 
+export type QuestionAggregate = {
+  totalPredictions: number
+  weightedConsensus: number | null
+  optionBreakdown: {
+    option: string
+    percentage: number
+  }[]
+  leadingOption: string | null
+  averageConfidence: number | null
+  latestPredictionAt: string | null
+}
+
+export type Prediction = {
+  selectedOption: string | null
+  probability: number | null
+  confidence: number
+  createdAt: string
+  updatedAt: string
+}
+
+export type QuestionDetail = {
+  question: Question
+  aggregate: QuestionAggregate
+}
+
 export type QuestionFilters = {
   category?: string
   type?: QuestionType
@@ -47,6 +72,12 @@ export type CreateQuestionInput = {
   options: string[]
   category: string
   closeAt: string
+}
+
+export type SubmitPredictionInput = {
+  selectedOption: string | null
+  probability: number | null
+  confidence: number
 }
 
 type SessionResponse = {
@@ -104,11 +135,11 @@ export async function fetchQuestions(
   return data.questions
 }
 
-export async function fetchQuestion(questionId: string): Promise<Question> {
+export async function fetchQuestionDetail(
+  questionId: string
+): Promise<QuestionDetail> {
   const response = await fetch(`${API_BASE_URL}/questions/${questionId}`)
-  const data = await parseResponse<{ question: Question }>(response)
-
-  return data.question
+  return parseResponse<QuestionDetail>(response)
 }
 
 export async function startDemoSession(): Promise<SessionResponse> {
@@ -169,4 +200,37 @@ export async function createQuestion(
   const data = await parseResponse<{ question: Question }>(response)
 
   return data.question
+}
+
+export async function fetchMyPrediction(
+  questionId: string,
+  token: string
+): Promise<Prediction | null> {
+  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/predictions/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  })
+  const data = await parseResponse<{ prediction: Prediction | null }>(response)
+
+  return data.prediction
+}
+
+export async function submitPrediction(
+  questionId: string,
+  input: SubmitPredictionInput,
+  token: string
+): Promise<{ prediction: Prediction; aggregate: QuestionAggregate }> {
+  const response = await fetch(`${API_BASE_URL}/questions/${questionId}/predictions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify(input)
+  })
+
+  return parseResponse<{ prediction: Prediction; aggregate: QuestionAggregate }>(
+    response
+  )
 }
