@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+.env
+.env.*
+!.env.example
+
+# Internal working docs
+Docs/_internal/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.vscode/
