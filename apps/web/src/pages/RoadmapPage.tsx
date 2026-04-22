@@ -8,7 +8,7 @@ export function RoadmapPage() {
     { text: 'Phase 1: foundation, auth, validation, testing', done: true },
     { text: 'Phase 2: question creation and browse flows', done: true },
     { text: 'Phase 3: prediction submission and consensus', done: true },
-    { text: 'Phase 4: resolution mechanism (MVP)', done: false }
+    { text: 'Phase 4: resolution mechanism (MVP)', done: true }
   ]
 
   return (
