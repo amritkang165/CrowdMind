@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Clock, HelpCircle, CheckCircle2, UserCircle, PieChart, Info, ChevronRight } from 'lucide-react'
+import { Clock, HelpCircle, CheckCircle2, UserCircle, PieChart, Info, ChevronRight, List } from 'lucide-react'
 
 import {
   fetchQuestionDetail,
